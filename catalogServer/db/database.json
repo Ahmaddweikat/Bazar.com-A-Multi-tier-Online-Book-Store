@@ -1,0 +1,30 @@
+[
+  {
+    "ID": 1,
+    "title": "How to get a good grade in DOS in 40 minutes a day.",
+    "price": 25,
+    "quantity": 400,
+    "topic": "Distributed Systems"
+  },
+  {
+    "ID": 2,
+    "title": "RPCs for Noobs.",
+    "price": 80,
+    "quantity": 255,
+    "topic": "Distributed Systems"
+  },
+  {
+    "ID": 3,
+    "title": "Xen and the Art of Surviving Undergraduate School.",
+    "price": 230,
+    "quantity": 50,
+    "topic": "Undergraduate School"
+  },
+  {
+    "ID": 4,
+    "title": "Cooking for the Impatient Undergrad.",
+    "price": 90,
+    "quantity": 100,
+    "topic": "Undergraduate School"
+  }
+]
