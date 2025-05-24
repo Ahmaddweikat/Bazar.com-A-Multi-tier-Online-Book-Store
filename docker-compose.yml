@@ -1,0 +1,53 @@
+#version: "3"
+
+services:
+  gateway-server:
+    build: ./gatewayServer
+    ports:
+      - "3000:3000"
+    depends_on:
+      - catalog-server-1
+      - catalog-server-2
+      - order-server-1
+      - order-server-2
+    container_name: gateway-server
+
+  catalog-server-1:
+    build: ./catalogServer
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - PEER_REPLICA=http://catalog-server-2:3003
+      - GATEWAY_URL=http://gateway-server:3000
+    container_name: catalog-server-1
+
+  catalog-server-2:
+    build: ./catalogServer
+    ports:
+      - "3003:3003"
+    environment:
+      - PORT=3003
+      - PEER_REPLICA=http://catalog-server-1:3001
+      - GATEWAY_URL=http://gateway-server:3000
+    container_name: catalog-server-2
+
+  order-server-1:
+    build: ./orderServer
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - PEER_REPLICA=http://order-server-2:3004
+      - GATEWAY_URL=http://gateway-server:3000
+    container_name: order-server-1
+
+  order-server-2:
+    build: ./orderServer
+    ports:
+      - "3004:3004"
+    environment:
+      - PORT=3004
+      - PEER_REPLICA=http://order-server-1:3002
+      - GATEWAY_URL=http://gateway-server:3000
+    container_name: order-server-2
