@@ -1,61 +1,124 @@
-const express = require("express");
-const { getDatabase, updateDatabase } = require("./db/utils");
-const app = express();
+const readline = require("readline");
+const fs = require("fs");
+// Sample books data (you can replace this with a database or file system)
+let books = JSON.parse(
+  fs.readFileSync("./catalogServer/db/database.json", "utf8")
+);
 
-app.get("/", (req, res) => {
-  res.send("Catalog server is running");
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
 });
 
-app.get("/search/:topic", (req, res) => {
-  const topic = req.params.topic;
+function displayMenu() {
+  console.log("\n=== Book Management System ===");
+  console.log("1. Show Books");
+  console.log("2. Search for Book");
+  console.log("3. Info (Search by ID)");
+  console.log("4. Purchase Book");
+  console.log("5. Exit");
+  console.log("==========================");
+}
 
-  getDatabase().then((database) => {
-    const books = database?.filter((book) => book.topic === topic);
-    if (books.length > 0) {
-      res.send(books);
-    } else {
-      res.status(404).send({ message: "No books found" });
-    }
+function showBooks() {
+  console.log("\nAvailable Books:");
+  books.forEach((book) => {
+    console.log(
+      `ID: ${book.ID} | Title: ${book.title} | Topic: ${book.topic} | Quantity: ${book.quantity} | Price: $${book.price}`
+    );
   });
-});
+}
 
-app.get("/info/:id", (req, res) => {
-  const bookId = parseInt(req.params.id);
+function searchBook() {
+  rl.question("\nEnter book topic or title to search: ", (search) => {
+    const searchTerm = search.toLowerCase();
+    const results = books.filter(
+      (book) =>
+        book.topic.toLowerCase().includes(searchTerm) ||
+        book.title.toLowerCase().includes(searchTerm)
+    );
 
-  getDatabase().then((database) => {
-    const book = database?.find((book) => book.ID === bookId);
+    if (results.length > 0) {
+      console.log("\nSearch Results:");
+      results.forEach((book) => {
+        console.log(
+          `ID: ${book.ID} | Title: ${book.title} | Quantity: ${book.quantity} | Price: $${book.price}`
+        );
+      });
+    } else {
+      console.log("No books found matching your search.");
+    }
+    mainMenu();
+  });
+}
+
+function getBookInfo() {
+  rl.question("\nEnter book ID: ", (ID) => {
+    const book = books.find((b) => b.ID === parseInt(ID));
     if (book) {
-      res.send(book);
+      console.log("\nBook Information:");
+      console.log(`ID: ${book.ID}`);
+      console.log(`Title: ${book.title}`);
+      console.log(`Topic: ${book.topic}`);
+      console.log(`Quantity: ${book.quantity}`);
+      console.log(`Price: $${book.price}`);
     } else {
-      res.status(404).send({ message: "Book not found" });
+      console.log("Book not found.");
     }
+    mainMenu();
   });
-});
+}
 
-app.post("/purchase/:id", (req, res) => {
-  const bookId = parseInt(req.params.id);
-
-  getDatabase().then((database) => {
-    const book = database?.find((book) => book.ID === bookId);
+function purchaseBook() {
+  rl.question("Enter book ID to purchase: ", (ID) => {
+    const book = books.find((b) => b.ID === parseInt(ID));
     if (book) {
       if (book.quantity > 0) {
         book.quantity--;
-        updateDatabase(database)
-          .then(() => res.send({ message: "Book purchased successfully" }))
-          .catch(() =>
-            res.status(500).send({ message: "Internal server error:" })
-          );
+        console.log("\nPurchase successful!");
+        console.log(`You bought "${book.title}" for $${book.price}`);
+        console.log(`Remaining quantity: ${book.quantity}`);
       } else {
-        res.status(400).send({ message: "Book out of stock" });
+        console.log("Sorry, this book is out of stock.");
       }
     } else {
-      res.status(404).send({ message: "Book not found" });
+      console.log("Book not found.");
+    }
+    mainMenu();
+  });
+}
+
+function mainMenu() {
+  displayMenu();
+  rl.question("Select an option (1-5): ", (choice) => {
+    switch (choice) {
+      case "1":
+        showBooks();
+        mainMenu();
+        break;
+      case "2":
+        searchBook();
+        break;
+      case "3":
+        getBookInfo();
+        break;
+      case "4":
+        purchaseBook();
+        break;
+      case "5":
+        console.log(
+          "Thank you for using the Bazar.com Book Management System. Goodbye!"
+        );
+        rl.close();
+        break;
+      default:
+        console.log("Invalid option. Please try again.");
+        mainMenu();
+        break;
     }
   });
-});
+}
 
-// Start the server
-const PORT = 3001;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// Start the application
+console.log("Welcome to the Bazar.com Book Management System!");
+mainMenu();
