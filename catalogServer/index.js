@@ -1,61 +1,94 @@
 const express = require("express");
-const { getDatabase, updateDatabase } = require("./db/utils");
+const fs = require("fs");
+const axios = require("axios");
+const path = require("path");
 const app = express();
+const PORT = process.env.PORT || 3001;
 
-app.get("/", (req, res) => {
-  res.send("Catalog server is running");
-});
+const DB_PATH = path.join(__dirname, "db", "database.json");
+const PEER_REPLICA = process.env.PEER_REPLICA || "http://catalog-server-2:3003";
+const GATEWAY_URL = process.env.GATEWAY_URL || "http://gateway-server:3000";
 
-app.get("/search/:topic", (req, res) => {
-  const topic = req.params.topic;
+// Track seen book IDs and topics independently
+let seenInfoIds = new Set();
+let seenSearchTopics = new Set();
 
-  getDatabase().then((database) => {
-    const books = database?.filter((book) => book.topic === topic);
-    if (books.length > 0) {
-      res.send(books);
-    } else {
-      res.status(404).send({ message: "No books found" });
-    }
-  });
-});
+function readDB() {
+  return JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
+}
 
-app.get("/info/:id", (req, res) => {
+function writeDB(data) {
+  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+}
+
+// Search books by topic
+
+// /info/:id
+app.get("/info/:id", async (req, res) => {
   const bookId = parseInt(req.params.id);
+  const db = readDB();
+  const book = db.books.find((b) => b.id === bookId);
 
-  getDatabase().then((database) => {
-    const book = database?.find((book) => book.ID === bookId);
-    if (book) {
-      res.send(book);
-    } else {
-      res.status(404).send({ message: "Book not found" });
-    }
-  });
+  if (!seenInfoIds.has(bookId)) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    seenInfoIds.add(bookId);
+  }
+
+  // Mark the topic as seen
+  if (book) {
+    seenSearchTopics.add(book.topic.toLowerCase());
+    res.json(book);
+  } else {
+    res.status(404).json({ error: "Book not found" });
+  }
 });
 
-app.post("/purchase/:id", (req, res) => {
+// /search/:topic
+app.get("/search/:topic", async (req, res) => {
+  const topic = req.params.topic.toLowerCase();
+  const db = readDB();
+  const result = db.books.filter((b) => b.topic.toLowerCase() === topic);
+
+  if (!seenSearchTopics.has(topic)) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    seenSearchTopics.add(topic);
+  }
+
+  // Mark all related book IDs as seen
+  result.forEach((book) => seenInfoIds.add(book.id));
+
+  res.json(result);
+});
+// Update stock
+app.post("/update-stock/:id/:quantity", async (req, res) => {
   const bookId = parseInt(req.params.id);
+  const quantity = parseInt(req.params.quantity);
+  const db = readDB();
+  const book = db.books.find((b) => b.id === bookId);
 
-  getDatabase().then((database) => {
-    const book = database?.find((book) => book.ID === bookId);
-    if (book) {
-      if (book.quantity > 0) {
-        book.quantity--;
-        updateDatabase(database)
-          .then(() => res.send({ message: "Book purchased successfully" }))
-          .catch(() =>
-            res.status(500).send({ message: "Internal server error:" })
-          );
-      } else {
-        res.status(400).send({ message: "Book out of stock" });
-      }
-    } else {
-      res.status(404).send({ message: "Book not found" });
-    }
-  });
+  if (!book) return res.status(404).json({ error: "Book not found" });
+  book.stock += quantity;
+  writeDB(db);
+
+  await axios.post(`${GATEWAY_URL}/invalidate/${bookId}`).catch(() => {});
+  await axios
+    .post(`${PEER_REPLICA}/sync-update-stock/${bookId}/${quantity}`)
+    .catch(() => {});
+
+  res.json({ message: "Stock updated" });
 });
 
-// Start the server
-const PORT = 3001;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+// Replica sync endpoint
+app.post("/sync-update-stock/:id/:quantity", (req, res) => {
+  const bookId = parseInt(req.params.id);
+  const quantity = parseInt(req.params.quantity);
+  const db = readDB();
+  const book = db.books.find((b) => b.id === bookId);
+  if (book) {
+    book.stock += quantity;
+    writeDB(db);
+  }
+  res.sendStatus(200);
 });
+
+app.listen(PORT, () => console.log(`Catalog server running on ${PORT}`));
