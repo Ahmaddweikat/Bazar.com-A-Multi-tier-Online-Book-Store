@@ -22,7 +22,3 @@ Order Service: Handles shopping cart and order placement
 ├── catalogServer/        # Backend service for book catalog & search
 ├── gatewaySever/         # FrontEnd for using this application
 ├── orderServer/          # Backend service for order/cart workflows
-
-
-نسخ
-تحرير
