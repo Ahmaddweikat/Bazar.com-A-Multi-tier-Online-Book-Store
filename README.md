@@ -2,6 +2,7 @@ Bazar is a multi‑tier online book store built as part of the Distributed Opera
 github.com
 
 🚀 Features
+
 🔍 Book Search – Query books by title, author, or topic
 
 📘 Detailed Page – View book descriptions, price, availability
